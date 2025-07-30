@@ -1,0 +1,15 @@
+<!doctype html>
+<html>
+  <head><title>{% block title %} {{ title }} {% endblock %}</title></head>
+  <body>
+  <h1>{{ welcome_text }}</h1>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/content">Content</a></li>
+            <li><a href="/about">About</a></li>
+        </ul>
+    </nav>
+    {% block body %}{% endblock %}
+  </body>
+</html>
