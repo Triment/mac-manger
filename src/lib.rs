@@ -1,8 +1,6 @@
 pub mod templates;
 pub mod handlers;
-use bb8::Pool;
-use bb8_postgres::PostgresConnectionManager;
-use tokio_postgres::NoTls;
+use sqlx::PgPool;
 
 use crate::templates::Templates;
 use std::sync::Arc;
@@ -10,5 +8,5 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct AppState {
     pub templates: Arc<Templates>,
-    pub pool: Pool<PostgresConnectionManager<NoTls>>,
+    pub pool: PgPool,
 }

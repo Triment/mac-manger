@@ -1,0 +1,116 @@
+employees: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  created_by: uuid {constraint: foreign_key}
+  department_id: uuid {constraint: foreign_key}
+  name: string
+  work_id: string
+  phone: string
+  last_updated: timestamp
+}
+
+virtual_card: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  employee_id: uuid {constraint: foreign_key}
+  type_id: uuid {constraint: foreign_key}
+  created_by: uuid {constraint: foreign_key}
+  content: string
+  last_updated: timestamp
+}
+
+card_type: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  created_by: uuid {constraint: foreign_key}
+  name: string
+  description: string
+  last_updated: timestamp
+}
+
+department: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  parent_id: uuid {constraint: foreign_key}
+  created_by: uuid {constraint: foreign_key}
+  name: string
+  description: string
+  last_updated: timestamp
+}
+
+department_employee: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  department_id: uuid {constraint: foreign_key}
+  employee_id: uuid {constraint: foreign_key}
+  last_updated: timestamp
+}
+
+admin: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  role_id: uuid | none {constraint: foreign_key}
+  username: string
+  password: string
+  email: string
+  last_updated: timestamp
+}
+# acl表，用于
+acl: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  action: smallint #r 0b0001 w 0b0010 d 0b0100
+  target: string # 资源类型，例如：department, department_employee, virtual_card, card_type
+  last_updated: timestamp
+}
+role: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  created_by: uuid {constraint: foreign_key}
+  name: string
+  description: string
+  last_updated: timestamp
+}
+role_acl: {#角色绑定acl
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  role_id: uuid {constraint: foreign_key}
+  acl_id: uuid {constraint: foreign_key}
+  last_updated: timestamp
+}
+
+admin_department: {#管理员绑定部门
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  admin_id: uuid {constraint: foreign_key}
+  department_id: uuid {constraint: foreign_key}
+  last_updated: timestamp
+}
+
+employees.created_by -> admin.id : 员工创建人
+employees.department_id -> department.id : 员工部门
+admin_department.admin_id -> admin.id : 管理员部门交叉
+admin_department.department_id -> department.id : 管理员部门交叉
+admin.role_id -> role.id : 管理员角色
+role_acl.role_id -> role.id : 角色绑定acl
+role_acl.acl_id -> acl.id : 角色绑定acl
+role.created_by -> admin.id : 角色创建人
+card_type.created_by -> admin.id : 卡类型创建人
+virtual_card.employee_id -> employees.id : 虚拟卡员工
+virtual_card.type_id -> card_type.id : 虚拟卡类型
+virtual_card.created_by -> admin.id : 虚拟卡创建人
+department.parent_id -> department.id : 部门父级
+department.created_by -> admin.id : 部门创建人
+department_employee.department_id -> department.id : 部门员工交叉
+department_employee.employee_id -> employees.id : 部门员工交叉
+
+
+log: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  admin: string
+  action: smallint
+  target: string
+  content: string
+  last_updated: timestamp
+}

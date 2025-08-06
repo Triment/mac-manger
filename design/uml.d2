@@ -1,0 +1,60 @@
+employee: {
+  shape: class
+
+  +id: uuid
+  +name: string
+  +work_id: string
+  +phone: number
+  +sex: string | none
+  +card: "[]virtual_card"
+
+  # Escape the # to prevent being parsed as comment
+  #lookaheadPos: d2ast.Position
+  # Or just wrap in quotes
+  #"#peekn(n int)": (s string, eof bool)
+
+  +change_name(): (name string)
+  +change_work_id(): (work_id string)
+  +change_phone(): (phone number)
+  +change_sex(): (sex string | none)
+  +add_card(): (card_id uuid)
+  +remove_card(): (card_id uuid)
+  +add_organization(): (organization_id uuid)
+  +remove_organization(): (organization_id uuid)
+}
+
+virtual_card: {
+  shape: class
+
+  +id: uuid
+  +type_id: uuid
+  +num: string
+  +employee_id: uuid | none
+
+  +change_type(): (card_type_id uuid)
+  +change_num(): (num string)
+  +change_employee(): (employee_id uuid)
+}
+
+card_type: {
+    shape: class
+
+    +id: uuid
+    +name: string
+    +description: string
+
+    +change_name(): (name string)
+    +change_description(): (description string)
+}
+
+organization: {
+    shape: class
+
+    +id: uuid
+    +name: string
+    +description: string
+
+    +change_name(): (name string)
+    +change_description(): (description string)
+    +get_employees(): "[]employee"
+}
