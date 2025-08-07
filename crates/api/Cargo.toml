@@ -1,0 +1,24 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+common = { path = "../common" }
+db = { path = "../db" }
+
+anyhow = { workspace = true }
+axum = { workspace = true }
+axum-extra = { workspace = true }
+http-body-util = { workspace = true }
+jsonwebtoken = { workspace = true }
+minijinja = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+validator = { workspace = true }

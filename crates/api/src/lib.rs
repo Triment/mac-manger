@@ -1,5 +1,4 @@
 pub mod templates;
-pub mod handlers;
 use sqlx::PgPool;
 
 use crate::templates::Templates;

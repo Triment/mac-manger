@@ -6,10 +6,6 @@ use axum::{
     Json, RequestPartsExt, Router,
 };
 use sqlx::postgres::PgPoolOptions;
-use std::sync::Arc;
-
-use mac_mange::AppState;
-use mac_mange::templates::Templates;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -18,7 +14,7 @@ async fn main() -> anyhow::Result<()> {
         .connect(dotenvy::var("DATABASE_URL")?.as_str())
         .await?;
     sqlx::migrate!().run(&pool).await?;
-    let app = mac_mange::handlers::app(pool);
+    let app = api::app(pool);
 
     let addr = "127.0.0.1:3000";
     println!("listening on http://{}", addr);
@@ -29,8 +25,6 @@ async fn main() -> anyhow::Result<()> {
 }
 
 // async fn handler_home(State(state): State<std::sync::Arc<AppState>>) -> Result<Html<String>, StatusCode> {
-
-
 //     let rendered = state.templates.render_home().unwrap();
 //     let conn = state.pool.get().await.map_err(internal_error).unwrap();
 //     let row = conn
