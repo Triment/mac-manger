@@ -8,7 +8,7 @@ use tower::{Service, ServiceExt};
 use http_body_util::BodyExt;
 #[sqlx::test]
 async fn test_handler_accounts(db: PgPool) {
-    let app = crate::handlers::app(db);
+    let app = api::app(db);
     let mut resp = app
         .oneshot(
             Request::post("/v1/accounts")
