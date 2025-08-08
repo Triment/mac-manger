@@ -70,3 +70,174 @@ async fn increment_and_do_stuff(mutex: &Mutex<i32>) {
 - 专用任务管理状态，消息传递给其他线程
 - 用Mutex
 - 避免互斥
+
+=== 消息传递
+tokio的channel可以在不同的任务之间传递消息
+- `tokio::sync::mpsc`是多生产者单消费者的通道
+- `tokio::sync::oneshot`是单生产者单消费者的通道
+- `tokio::sync::broadcast`是多生产者多消费者的通道
+- `tokio::sync::watch`是单生产者多消费者的通道
+
+```rust
+use tokio::sync::mpsc;//多生产者单消费者
+
+#[tokio::main]
+async fn main() {
+    let (tx, mut rx) = mpsc::channel(32);//创建一个通道，缓冲区大小为32，缓冲区满会导致tx.send(cmd).await休眠，直到有空间可用
+    let tx2 = tx.clone();
+
+    tokio::spawn(async move {
+        tx.send("sending from first handle").await.unwrap();
+    });
+
+    tokio::spawn(async move {
+        tx2.send("sending from second handle").await.unwrap();
+    });
+
+    while let Some(message) = rx.recv().await {
+        println!("GOT = {}", message);
+    }
+}
+```
+
+封装专用任务管理状态
+
+```rust
+let (tx, mut rx) = mpsc::channel(32);
+//manager专门用于执行任务，与其他线程通过消息传递通信
+let manager = tokio::spawn(async move {
+    // Establish a connection to the server
+    let mut client = client::connect("127.0.0.1:6379").await.unwrap();
+
+    // Start receiving messages
+    while let Some(cmd) = rx.recv().await {
+        use Command::*;
+
+        match cmd {
+            Get { key } => {
+                client.get(&key).await;
+            }
+            Set { key, val } => {
+                client.set(&key, val).await;
+            }
+        }
+    }
+});
+let tx2 = tx.clone();
+
+// Spawn two tasks, one gets a key, the other sets a key
+let t1 = tokio::spawn(async move {
+    let cmd = Command::Get {
+        key: "foo".to_string(),
+    };
+
+    tx.send(cmd).await.unwrap();
+});
+
+let t2 = tokio::spawn(async move {
+    let cmd = Command::Set {
+        key: "foo".to_string(),
+        val: "bar".into(),
+    };
+
+    tx2.send(cmd).await.unwrap();
+});
+t1.await.unwrap();
+t2.await.unwrap();
+manager.await.unwrap();//等待manager处理结束
+```
+
+=== oneshot 通道
+```rust
+use bytes::Bytes;
+use mini_redis::client;
+use tokio::sync::{mpsc, oneshot};
+
+/// Multiple different commands are multiplexed over a single channel.
+#[derive(Debug)]
+enum Command {
+    Get {
+        key: String,
+        resp: Responder<Option<Bytes>>,
+    },
+    Set {
+        key: String,
+        val: Bytes,
+        resp: Responder<()>,
+    },
+}
+
+/// Provided by the requester and used by the manager task to send the command
+/// response back to the requester.
+type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
+
+#[tokio::main]
+async fn main() {
+    let (tx, mut rx) = mpsc::channel(32);
+    // Clone a `tx` handle for the second f
+    let tx2 = tx.clone();
+
+    let manager = tokio::spawn(async move {
+        // Open a connection to the mini-redis address.
+        let mut client = client::connect("127.0.0.1:6379").await.unwrap();
+
+        while let Some(cmd) = rx.recv().await {
+            match cmd {
+                Command::Get { key, resp } => {
+                    let res = client.get(&key).await;
+                    // Ignore errors
+                    let _ = resp.send(res);
+                }
+                Command::Set { key, val, resp } => {
+                    let res = client.set(&key, val).await;
+                    // Ignore errors
+                    let _ = resp.send(res);
+                }
+            }
+        }
+    });
+
+    // Spawn two tasks, one setting a value and other querying for key that was
+    // set.
+    let t1 = tokio::spawn(async move {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let cmd = Command::Get {
+            key: "foo".to_string(),
+            resp: resp_tx,
+        };
+
+        // Send the GET request
+        if tx.send(cmd).await.is_err() {
+            eprintln!("connection task shutdown");
+            return;
+        }
+
+        // Await the response
+        let res = resp_rx.await;
+        println!("GOT (Get) = {:?}", res);
+    });
+
+    let t2 = tokio::spawn(async move {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let cmd = Command::Set {
+            key: "foo".to_string(),
+            val: "bar".into(),
+            resp: resp_tx,
+        };
+
+        // Send the SET request
+        if tx2.send(cmd).await.is_err() {
+            eprintln!("connection task shutdown");
+            return;
+        }
+
+        // Await the response
+        let res = resp_rx.await;
+        println!("GOT (Set) = {:?}", res);
+    });
+
+    t1.await.unwrap();
+    t2.await.unwrap();
+    manager.await.unwrap();
+}
+```
