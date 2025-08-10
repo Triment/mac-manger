@@ -241,3 +241,87 @@ async fn main() {
     manager.await.unwrap();
 }
 ```
+
+=== 读写
+
+```rust
+use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+
+#[tokio::main]
+async fn main() -> io::Result<()> {
+    let socket = TcpStream::connect("127.0.0.1:6142").await?;
+    let (mut rd, mut wr) = io::split(socket);//拆分套接字,实现了AsyncRead + AsyncWrite的handler都可以拆分，内部使用了Arc and a Mutex
+
+    // Write data in the background
+    tokio::spawn(async move {
+        wr.write_all(b"hello\r\n").await?;
+        wr.write_all(b"world\r\n").await?;
+
+        // Sometimes, the rust type inferencer needs
+        // a little help
+        Ok::<_, io::Error>(())
+    });
+```
+
+echo server
+```rust
+use tokio::io;
+use tokio::net::TcpListener;
+
+#[tokio::main]
+async fn main() -> io::Result<()> {
+    let listener = TcpListener::bind("127.0.0.1:6142").await?;
+
+    loop {
+        let (mut socket, _) = listener.accept().await?;
+
+        tokio::spawn(async move {
+            let (mut rd, mut wr) = socket.split();//0成本，没有Arc和Mutex，但是不能垮任务
+            //socket.into_split()也可以拆分套接字,这个方法可以在任务中移动，但是会多一层Arc的花销
+            if io::copy(&mut rd, &mut wr).await.is_err() {
+                eprintln!("failed to copy");
+            }
+        });
+    }
+}
+```
+手动实现
+```rust
+use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
+
+#[tokio::main]
+async fn main() -> io::Result<()> {
+    let listener = TcpListener::bind("127.0.0.1:6142").await?;
+
+    loop {
+        let (mut socket, _) = listener.accept().await?;
+
+        tokio::spawn(async move {
+            let mut buf = vec![0; 1024];
+
+            loop {
+                match socket.read(&mut buf).await {
+                    // Return value of `Ok(0)` signifies that the remote has
+                    // closed
+                    Ok(0) => return,// 退出循环
+                    Ok(n) => {
+                        // Copy the data back to socket
+                        if socket.write_all(&buf[..n]).await.is_err() {
+                            // Unexpected socket error. There isn't much we can
+                            // do here so just stop processing.
+                            return;
+                        }
+                    }
+                    Err(_) => {
+                        // Unexpected socket error. There isn't much we can do
+                        // here so just stop processing.
+                        return;
+                    }
+                }
+            }
+        });
+    }
+}
+```
